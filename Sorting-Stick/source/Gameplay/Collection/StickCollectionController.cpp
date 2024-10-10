@@ -5,6 +5,7 @@
 #include "Global/ServiceLocator.h"
 #include "Gameplay/Collection/Stick.h"
 #include <random>
+#include <iostream>
 
 namespace Gameplay
 {
@@ -29,6 +30,8 @@ namespace Gameplay
 
 		void StickCollectionController::initialize()
 		{
+			sort_state = SortState::NOT_SORTING;
+			color_delay = collection_model->initial_color_delay;
 			collection_view->initialize(this);
 			initializeSticks();
 			reset();
@@ -37,7 +40,6 @@ namespace Gameplay
 		void StickCollectionController::initializeSticks()
 		{
 			float rectangle_width = calculateStickWidth();
-
 
 			for (int i = 0; i < collection_model->number_of_elements; i++)
 			{
@@ -55,6 +57,8 @@ namespace Gameplay
 			collection_view->update();
 			for (int i = 0; i < sticks.size(); i++) sticks[i]->stick_view->update();
 		}
+
+		
 
 		void StickCollectionController::render()
 		{
@@ -91,9 +95,10 @@ namespace Gameplay
 		{
 			for (int i = 0; i < sticks.size(); i++)
 			{
-				float x_position = (i * sticks[i]->stick_view->getSize().x) + ((i + 1) * collection_model->elements_spacing);
+				
+				float x_position = (i * sticks[i]->stick_view->getSize().x) + ((i) * collection_model->elements_spacing);
 				float y_position = collection_model->element_y_position - sticks[i]->stick_view->getSize().y;
-
+			
 				sticks[i]->stick_view->setPosition(sf::Vector2f(x_position, y_position));
 			}
 		}
@@ -114,9 +119,101 @@ namespace Gameplay
 
 		void StickCollectionController::processSortThreadState()
 		{
-			if (sort_thread.joinable() && isCollectionSorted()) sort_thread.join();
+			if (sort_thread.joinable() && isCollectionSorted()) {
+				sort_thread.join();
+				sort_state = SortState::NOT_SORTING;
+			}
 		}
 
+		void StickCollectionController::processBubbleSort() {
+			Sound::SoundService* sound = Global::ServiceLocator::getInstance()->getSoundService();
+
+			for (int j = 0; j < sticks.size(); j++) {   // Loop through the sticks array
+				if (sort_state == SortState::NOT_SORTING) { break; }   // Check if sorting has stopped or been interrupted
+
+				bool swapped = false;  // To track if a swap was made
+
+				for (int i = 1; i < sticks.size() - j; i++) {    // Loop through the array, reducing the range each pass
+					if (sort_state == SortState::NOT_SORTING) { break; }      // Check if sorting has stopped or been interrupted
+
+					// Increment the number of array accesses and comparisons
+					number_of_array_access += 2;
+					number_of_comparisons++;
+
+					sound->playSound(Sound::SoundType::COMPARE_SFX);      // Play the compare sound effect
+
+					// Set the current sticks to the processing color
+					sticks[i - 1]->stick_view->setFillColor(collection_model->processing_element_color);
+					sticks[i]->stick_view->setFillColor(collection_model->processing_element_color);
+
+					if (sticks[i - 1]->data > sticks[i]->data) {      // Check if the current stick is greater than the next stick
+						// Swap the sticks if necessary
+						std::swap(sticks[i - 1], sticks[i]);
+						swapped = true;  // Set swapped to true if there was a swap
+					}
+
+					std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
+
+					// Reset the stick colors
+					sticks[i - 1]->stick_view->setFillColor(collection_model->element_color);
+					sticks[i]->stick_view->setFillColor(collection_model->element_color);
+
+					updateStickPosition();
+				}
+
+				if (sticks.size() - j - 1 >= 0) {    // Set the last sorted stick to the placement position color
+					sticks[sticks.size() - j - 1]->stick_view->setFillColor(collection_model->placement_position_element_color);
+				}
+
+				if (!swapped) { break; }    // If no swaps were made, the array is already sorted
+			}
+			setCompletedColor();
+		}
+
+		void StickCollectionController::processInsertionSort()
+		{
+			Sound::SoundService* sound = Global::ServiceLocator::getInstance()->getSoundService();
+
+			for (int j = 0; j < sticks.size(); j++) {   
+				if (sort_state == SortState::NOT_SORTING) { break; }   
+
+				Stick* key = sticks[j];
+				number_of_array_access += 1;
+				int i = j - 1;
+				while (i >= 0 && sticks[i]->data > key->data) {
+					if (sort_state == SortState::NOT_SORTING) { break; }
+					number_of_array_access += 2;
+					number_of_comparisons++;
+					sticks[i + 1] = sticks[i];
+					sticks[i + 1]->stick_view->setFillColor(collection_model->processing_element_color);
+					sound->playSound(Sound::SoundType::COMPARE_SFX);
+					std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
+					sticks[i + 1]->stick_view->setFillColor(collection_model->selected_element_color);
+					i--;
+				}
+				sticks[i + 1] = key;
+				sticks[i + 1]->stick_view->setFillColor(collection_model->temeporary_processed_color);
+				
+				updateStickPosition();
+
+			}
+			setCompletedColor();
+		}
+
+		void StickCollectionController::setCompletedColor() {
+			for (int k = 0; k < sticks.size(); k++) {
+				if (sort_state == SortState::NOT_SORTING) { break; } // Check if sorting is stoped or completed
+				sticks[k]->stick_view->setFillColor(collection_model->element_color);
+			}
+			Sound::SoundService* sound = Global::ServiceLocator::getInstance()->getSoundService();
+			for (int i = 0; i < sticks.size(); ++i) {
+				if (sort_state == SortState::NOT_SORTING) { break; }  // Check if sorting is stoped or completed
+				sound->playSound(Sound::SoundType::COMPARE_SFX);
+				sticks[i]->stick_view->setFillColor(collection_model->placement_position_element_color);
+				std::this_thread::sleep_for(std::chrono::milliseconds(color_delay));
+			}
+			
+		}
 
 		void StickCollectionController::resetSticksColor()
 		{
@@ -132,8 +229,9 @@ namespace Gameplay
 		void StickCollectionController::reset()
 		{
 			current_operation_delay = 0;
+			color_delay = 0;
 			if (sort_thread.joinable()) sort_thread.join();
-
+			sort_state = SortState::NOT_SORTING;
 			shuffleSticks();
 			resetSticksColor();
 			resetVariables();
@@ -141,15 +239,19 @@ namespace Gameplay
 
 		void StickCollectionController::sortElements(SortType sort_type)
 		{
+			sort_state = SortState::SORTING;
 			current_operation_delay = collection_model->operation_delay;
 			this->sort_type = sort_type;
 
-			/*switch (sort_type)
+			switch (sort_type)
 			{
 			case Gameplay::Collection::SortType::BUBBLE_SORT:
 				sort_thread = std::thread(&StickCollectionController::processBubbleSort, this);
 				break;
-			}*/
+			case Gameplay::Collection::SortType::INSERTION_SORT:
+				sort_thread = std::thread(&StickCollectionController::processInsertionSort, this);
+				break;
+			}
 		}
 
 		bool StickCollectionController::isCollectionSorted()
