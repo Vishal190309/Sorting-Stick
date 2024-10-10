@@ -170,6 +170,36 @@ namespace Gameplay
 			setCompletedColor();
 		}
 
+		void StickCollectionController::processInsertionSort()
+		{
+			Sound::SoundService* sound = Global::ServiceLocator::getInstance()->getSoundService();
+
+			for (int j = 0; j < sticks.size(); j++) {   
+				if (sort_state == SortState::NOT_SORTING) { break; }   
+
+				Stick* key = sticks[j];
+				number_of_array_access += 1;
+				int i = j - 1;
+				while (i >= 0 && sticks[i]->data > key->data) {
+					if (sort_state == SortState::NOT_SORTING) { break; }
+					number_of_array_access += 2;
+					number_of_comparisons++;
+					sticks[i + 1] = sticks[i];
+					sticks[i + 1]->stick_view->setFillColor(collection_model->processing_element_color);
+					sound->playSound(Sound::SoundType::COMPARE_SFX);
+					std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
+					sticks[i + 1]->stick_view->setFillColor(collection_model->selected_element_color);
+					i--;
+				}
+				sticks[i + 1] = key;
+				sticks[i + 1]->stick_view->setFillColor(collection_model->temeporary_processed_color);
+				
+				updateStickPosition();
+
+			}
+			setCompletedColor();
+		}
+
 		void StickCollectionController::setCompletedColor() {
 			for (int k = 0; k < sticks.size(); k++) {
 				if (sort_state == SortState::NOT_SORTING) { break; } // Check if sorting is stoped or completed
@@ -217,6 +247,9 @@ namespace Gameplay
 			{
 			case Gameplay::Collection::SortType::BUBBLE_SORT:
 				sort_thread = std::thread(&StickCollectionController::processBubbleSort, this);
+				break;
+			case Gameplay::Collection::SortType::INSERTION_SORT:
+				sort_thread = std::thread(&StickCollectionController::processInsertionSort, this);
 				break;
 			}
 		}
