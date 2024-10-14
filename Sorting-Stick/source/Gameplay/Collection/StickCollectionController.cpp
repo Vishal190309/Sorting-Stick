@@ -222,6 +222,46 @@ namespace Gameplay
 
 		}
 
+		void StickCollectionController::processSelectionSort()
+		{
+			Sound::SoundService* sound = Global::ServiceLocator::getInstance()->getSoundService();
+
+			for (int j = 0; j < sticks.size(); j++) {  
+				if (sort_state == SortState::NOT_SORTING) { break; }  
+				int minIndex = j;
+				sticks[minIndex]->stick_view->setFillColor(collection_model->processing_element_color);
+				for (int i = minIndex; i < sticks.size() ; i++) {    
+					if (sort_state == SortState::NOT_SORTING) { break; } 
+
+				
+					number_of_array_access += 2;
+					number_of_comparisons++;
+
+					sound->playSound(Sound::SoundType::COMPARE_SFX); 
+
+					sticks[i]->stick_view->setFillColor(collection_model->processing_element_color);
+
+					std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
+
+					if (sticks[i]->data < sticks[minIndex]->data) {
+						sticks[minIndex]->stick_view->setFillColor(collection_model->element_color);
+						minIndex = i;
+						sticks[minIndex]->stick_view->setFillColor(collection_model->temporary_processing_color);
+					}
+					else {
+						sticks[i]->stick_view->setFillColor(collection_model->element_color);
+					}
+					
+				
+				}
+				std::swap(sticks[j], sticks[minIndex]);
+				number_of_array_access += 2;
+				sticks[j]->stick_view->setFillColor(collection_model->placement_position_element_color);
+				updateStickPosition();
+			}
+			setCompletedColor();
+		}
+
 		void StickCollectionController::setCompletedColor() {
 			for (int k = 0; k < sticks.size(); k++) {
 				if (sort_state == SortState::NOT_SORTING) { break; } // Check if sorting is stoped or completed
@@ -272,6 +312,9 @@ namespace Gameplay
 				break;
 			case Gameplay::Collection::SortType::INSERTION_SORT:
 				sort_thread = std::thread(&StickCollectionController::processInsertionSort, this);
+				break;
+			case Gameplay::Collection::SortType::SELECTION_SORT:
+				sort_thread = std::thread(&StickCollectionController::processSelectionSort, this);
 				break;
 			}
 		}
