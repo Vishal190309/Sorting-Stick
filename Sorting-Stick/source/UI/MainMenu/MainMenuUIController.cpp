@@ -113,6 +113,8 @@ namespace UI
         void MainMenuUIController::quickSortButtonCallback()
         {
             ServiceLocator::getInstance()->getSoundService()->playSound(SoundType::BUTTON_CLICK);
+            GameService::setGameState(GameState::GAMEPLAY);
+            ServiceLocator::getInstance()->getGameplayService()->sortElement(Gameplay::Collection::SortType::QUICK_SORT);
         }
 
         void MainMenuUIController::radixSortButtonCallback()

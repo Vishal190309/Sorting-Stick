@@ -268,6 +268,47 @@ namespace Gameplay
 			setCompletedColor();
 		}
 
+		void StickCollectionController::processQuickSort()
+		{
+			quickSort(0, sticks.size() - 1);
+			setCompletedColor();
+		}
+
+		int StickCollectionController::partition(int low, int high) {
+
+			Sound::SoundService* sound = Global::ServiceLocator::getInstance()->getSoundService();
+			Stick* pivot = sticks[high];
+			sticks[high]->stick_view->setFillColor(collection_model->selected_element_color);
+			int swapIndex = low - 1;
+			for (int currentIndex = low; currentIndex < high; currentIndex++) {
+				number_of_array_access += 2;
+				number_of_comparisons++;
+				sticks[currentIndex]->stick_view->setFillColor(collection_model->processing_element_color);
+				if (sticks[currentIndex]->data <= pivot->data) {
+					swapIndex++;
+					std::swap(sticks[swapIndex], sticks[currentIndex]);
+					updateStickPosition();
+					sound->playSound(Sound::SoundType::COMPARE_SFX);
+					std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
+				}
+				else {
+					sticks[currentIndex]->stick_view->setFillColor(collection_model->element_color);
+				}
+			}
+			std::swap(sticks[swapIndex + 1], sticks[high]);
+			number_of_array_access += 2;
+			updateStickPosition();
+			return swapIndex + 1;
+		}
+
+		void StickCollectionController::quickSort( int low, int high) {
+			if (low < high) {
+				int pivotIndex = partition(low, high);
+				quickSort( low, pivotIndex - 1);
+				quickSort(pivotIndex + 1, high);
+			}
+		}
+
 		// Out-of-Place Merge function
 		void StickCollectionController::merge(int left, int mid, int right)
 		{
@@ -446,6 +487,9 @@ namespace Gameplay
 				sort_thread = std::thread(&StickCollectionController::processSelectionSort, this);
 			case Gameplay::Collection::SortType::MERGE_SORT:
 				sort_thread = std::thread(&StickCollectionController::processMergeSort, this);
+				break;
+			case Gameplay::Collection::SortType::QUICK_SORT:
+				sort_thread = std::thread(&StickCollectionController::processQuickSort, this);
 				break;
 			}
 		}
