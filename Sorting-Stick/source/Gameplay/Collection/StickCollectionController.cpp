@@ -262,6 +262,135 @@ namespace Gameplay
 			setCompletedColor();
 		}
 
+		void StickCollectionController::processMergeSort()
+		{
+			mergeSort(0, sticks.size() - 1);
+			setCompletedColor();
+		}
+
+		// Out-of-Place Merge function
+		void StickCollectionController::merge(int left, int mid, int right)
+		{
+			SoundService* sound = Global::ServiceLocator::getInstance()->getSoundService();
+
+			std::vector<Stick*> temp(right - left + 1);
+			int k = 0;
+
+			// Copy elements to the temporary array
+			for (int index = left; index <= right; ++index) {
+				temp[k++] = sticks[index];
+				number_of_array_access++;
+				sticks[index]->stick_view->setFillColor(collection_model->temporary_processing_color);
+				updateStickPosition();
+			}
+
+			int i = 0;  // Start of the first half in temp
+			int j = mid - left + 1;  // Start of the second half in temp
+			k = left;  // Start position in the original array to merge back
+
+			// Merge elements back to the original array from temp
+			while (i < mid - left + 1 && j < temp.size()) {
+				number_of_comparisons++;
+				number_of_array_access += 2;
+				if (temp[i]->data <= temp[j]->data) {
+					sticks[k] = temp[i++];
+					number_of_array_access++;
+				}
+				else {
+					sticks[k] = temp[j++];
+					number_of_array_access++;
+				}
+
+				sound->playSound(SoundType::COMPARE_SFX);
+				sticks[k]->stick_view->setFillColor(collection_model->processing_element_color);
+				updateStickPosition();  // Immediate update after assignment
+				std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
+
+				k++;
+			}
+
+			// Handle remaining elements from both halves
+			while (i < mid - left + 1 || j < temp.size()) {
+				number_of_array_access++;
+				if (i < mid - left + 1) {
+					sticks[k] = temp[i++];
+				}
+				else {
+					sticks[k] = temp[j++];
+				}
+
+				sound->playSound(SoundType::COMPARE_SFX);
+				sticks[k]->stick_view->setFillColor(collection_model->processing_element_color);
+				updateStickPosition();  // Immediate update
+				std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
+
+				k++;
+			}
+		}
+
+		// Out-of-Place Merge Sort function
+		void StickCollectionController::mergeSort(int left, int right)
+		{
+			if (left >= right) return;
+			int mid = left + (right - left) / 2;
+
+			mergeSort(left, mid);
+			mergeSort(mid + 1, right);
+			merge(left, mid, right);
+		}
+
+		void StickCollectionController::inPlaceMergeSort(int left, int right) {
+			if (left < right) {
+				int middle = left + (right - left) / 2;
+
+				// Sort first and second halves
+				inPlaceMergeSort(left, middle);
+				inPlaceMergeSort( middle + 1, right);
+
+				inPlaceMerge(left, middle, right);
+			}
+			
+		}
+
+		void StickCollectionController::inPlaceMerge(int left, int mid, int right) {
+			Sound::SoundService* sound = Global::ServiceLocator::getInstance()->getSoundService();
+
+			int start2 = mid + 1;
+			if (sticks[mid]->data <= sticks[start2]->data) {
+				number_of_array_access += 2;
+				number_of_comparisons++;
+				return;
+			}
+			
+			while (left <= mid && start2 <= right) {
+				number_of_array_access += 2;
+				number_of_comparisons++;
+				if (sticks[left]->data <= sticks[start2]->data) {
+					left++;
+				}
+				else {
+					Stick* swpaData = sticks[start2];
+					int index = start2;
+					while (index != left) {
+						sticks[index] = sticks[index - 1];
+						number_of_array_access += 2;
+						index--;
+					}
+					sticks[left] = swpaData;
+					number_of_array_access++;
+					left++;
+					mid++;
+					start2++;
+					updateStickPosition();
+				}
+				
+				sound->playSound(Sound::SoundType::COMPARE_SFX);
+				sticks[left-1]->stick_view->setFillColor(collection_model->processing_element_color);
+				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			}
+			
+		}
+
 		void StickCollectionController::setCompletedColor() {
 			for (int k = 0; k < sticks.size(); k++) {
 				if (sort_state == SortState::NOT_SORTING) { break; } // Check if sorting is stoped or completed
@@ -315,6 +444,8 @@ namespace Gameplay
 				break;
 			case Gameplay::Collection::SortType::SELECTION_SORT:
 				sort_thread = std::thread(&StickCollectionController::processSelectionSort, this);
+			case Gameplay::Collection::SortType::MERGE_SORT:
+				sort_thread = std::thread(&StickCollectionController::processMergeSort, this);
 				break;
 			}
 		}
