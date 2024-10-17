@@ -292,9 +292,9 @@ namespace Gameplay
 			}
 			
 			while (left <= mid && start2 <= right) {
+				number_of_array_access += 2;
+				number_of_comparisons++;
 				if (sticks[left]->data <= sticks[start2]->data) {
-					number_of_array_access += 2;
-					number_of_comparisons++;
 					left++;
 				}
 				else {
@@ -306,15 +306,16 @@ namespace Gameplay
 						index--;
 					}
 					sticks[left] = swpaData;
+					number_of_array_access++;
 					left++;
 					mid++;
 					start2++;
+					updateStickPosition();
 				}
-				updateStickPosition();
+				
 				sound->playSound(Sound::SoundType::COMPARE_SFX);
 				sticks[left-1]->stick_view->setFillColor(collection_model->processing_element_color);
-				std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
-				sticks[left-1]->stick_view->setFillColor(collection_model->element_color);
+				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 			}
 			
 		}
