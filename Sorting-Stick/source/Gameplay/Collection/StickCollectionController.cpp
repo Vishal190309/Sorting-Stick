@@ -104,6 +104,16 @@ namespace Gameplay
 			}
 		}
 
+		void StickCollectionController::updateStickPosition(int i)
+		{
+		
+			float x_position = (i * sticks[i]->stick_view->getSize().x) + ((i)*collection_model->elements_spacing);
+			float y_position = collection_model->element_y_position - sticks[i]->stick_view->getSize().y;
+
+			sticks[i]->stick_view->setPosition(sf::Vector2f(x_position, y_position));
+			
+		}
+
 		void StickCollectionController::shuffleSticks()
 		{
 			std::random_device device;
@@ -273,6 +283,58 @@ namespace Gameplay
 			quickSort(0, sticks.size() - 1);
 			setCompletedColor();
 		}
+
+		void StickCollectionController::processRadixSort()
+		{
+			radixSort();
+			setCompletedColor();
+		}
+
+		void StickCollectionController::countSort(int exponent) {
+			Sound::SoundService* sound = Global::ServiceLocator::getInstance()->getSoundService();
+			std::vector<Stick*> ans(sticks.size(),0);
+			std::vector<int> count(sticks.size(),0);
+			for (int i = 0; i < sticks.size(); i++) {
+				sticks[i]->stick_view->setFillColor(collection_model->processing_element_color);
+				count[(sticks[i]->data / exponent) % 10]++;
+				sound->playSound(Sound::SoundType::COMPARE_SFX);
+				std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
+				sticks[i]->stick_view->setFillColor(collection_model->element_color);
+				number_of_array_access ++;
+			}
+
+			for (int i = 1; i < sticks.size(); i++) {
+				count[i] = count[i] + count[i - 1];
+			}
+
+			for (int i = sticks.size() - 1; i >= 0; i--) {
+				int index = --count[(sticks[i]->data / exponent) % 10];
+				sticks[i]->stick_view->setFillColor(collection_model->temporary_processing_color);
+				ans[index] = sticks[i];
+				number_of_array_access++;
+			}
+			for (int i = 0; i < sticks.size(); i++) {
+				sticks[i] = ans[i];
+				sticks[i]->stick_view->setFillColor(collection_model->placement_position_element_color);
+				updateStickPosition(i);
+				sound->playSound(Sound::SoundType::COMPARE_SFX);
+				std::this_thread::sleep_for(std::chrono::milliseconds(current_operation_delay));
+			}
+		}
+
+		void StickCollectionController::radixSort() {
+			int maxNumber = sticks[0]->data;
+			for (int i = 1; i < sticks.size(); i++) {
+				if (maxNumber < sticks[i]->data) {
+					maxNumber = sticks[i]->data;
+				}
+			}
+			for (int exponent = 1; maxNumber/exponent >0; exponent *=10) {
+				countSort( exponent);
+			}
+		}
+
+
 
 		int StickCollectionController::partition(int low, int high) {
 
@@ -490,6 +552,8 @@ namespace Gameplay
 				break;
 			case Gameplay::Collection::SortType::QUICK_SORT:
 				sort_thread = std::thread(&StickCollectionController::processQuickSort, this);
+			case Gameplay::Collection::SortType::RADIX_SORT:
+				sort_thread = std::thread(&StickCollectionController::processRadixSort, this);
 				break;
 			}
 		}
